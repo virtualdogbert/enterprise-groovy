@@ -31,6 +31,9 @@ import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.AbstractASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 
+/**
+ * A Global AST transform for applying static compilation and enforcing, based on config.
+ */
 @CompileStatic
 @GroovyASTTransformation(phase = CompilePhase.SEMANTIC_ANALYSIS)
 class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
@@ -119,7 +122,7 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
     }
 
     /**
-     * Gets the conventions configurations for static compilation.
+     * Sets up the conventions configurations for static compilation.
      */
     static boolean setupConfiguration() {
         ConfigSlurper configSlurper = new ConfigSlurper()
@@ -140,6 +143,7 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
 
         compileStaticExtensionsList = (List<String>) config.compileStaticExtensions
         limitCompileStaticExtensions = config.limitCompileStaticExtensions != null ? config.limitCompileStaticExtensions : false
+
         defAllowed = config.defAllowed != null ? config.defAllowed : true
         skipDefaultPackage = config.skipDefaultPackage != null ? config.skipDefaultPackage : false
 
@@ -178,11 +182,26 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
         methodNode.annotations*.classNode.name.any { String annotation -> annotation in annotations }
     }
 
+    /**
+     * Checks to see if a class is on the white list for being exempt for static compilation.
+     *
+     * @param classNode the class node of the class to check.
+     *
+     * @return true if the class node or part of its package is contained in the white list, false otherwise.
+     */
     static boolean inWhiteList(ClassNode classNode) {
         getDynamicCompileWhiteList().any { String path -> classNode.name.contains(path) }
     }
 
 
+    /**
+     * Checks classes for the use of CompileStatic, and checks to see if it uses extensions that are not on the
+     * extensions that are whitelisted.
+     *
+     * @param classNode the class node to check.
+     *
+     * @return true if the class node has @CompileStatic, and has extensions not on the whitelist, false otherwise.
+     */
     static boolean hasOtherExtensions(ClassNode classNode) {
         for (AnnotationNode annotation : classNode.annotations) {
 
@@ -200,7 +219,14 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
         return false
     }
 
-
+    /**
+     * Checks methods for the use of CompileStatic, and checks to see if it uses extensions that are not on the
+     * extensions that are whitelisted.
+     *
+     * @param methodNode the method node to check.
+     *
+     * @return true if the method node has @CompileStatic, and has extensions not on the whitelist, false otherwise.
+     */
     static boolean hasOtherExtensions(MethodNode methodNode) {
         for (AnnotationNode annotation : methodNode.annotations) {
 
@@ -219,19 +245,17 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
     }
 
 
-/**
- * Adds an annotation to a class node, if it doesn't already have that annotation, with a constant value.
- *
- * @param classNode The class node to add th annotation to.
- * @param annotation The class of the annotation to add.
- * @param value The optional value to set for the annotation
- */
+    /**
+     * Adds @CompileStatic to the class node with the extensions from the white list.
+     *
+     * @param classNode The class node to add @CompileStatic to.
+     */
     static void addCompileStatic(ClassNode classNode) {
-        if (!hasAnnotation(classNode, excludedAnnotations)) {
+        if (!hasAnnotation(classNode, getExcludedAnnotations())) {
             AnnotationNode classAnnotation = new AnnotationNode(new ClassNode(CompileStatic))
 
             if(getExtensions()) {
-                classAnnotation.addMember(getExtensions(), compileStaticExtensions)
+                classAnnotation.addMember(getExtensions(), getCompileStaticExtensions())
             }
 
             classNode.addAnnotation(classAnnotation)
