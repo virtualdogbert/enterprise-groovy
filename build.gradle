@@ -159,7 +159,7 @@ bintray {
         desc = 'This library provides enterprise level control over Groovy compilation, like static copliation by default.'
         issueTrackerUrl = "https://github.com/virtualdogbert/enterprise-groovy/issues"
         vcsUrl = "https://github.com/virtualdogbert/enterprise-groovy"
-        websiteUrl = "https://virtualdogbert.github.io/enterprise-groovy"
+        websiteUrl = "https://virtualdogbert.github.io/enterprise-groovy-plugin/"
         labels = ['gradle', 'plugin', 'groovy', 'enterprise', 'compileStatic', 'static compiliation', 'static']
         licenses = ['Apache-2.0']
     }
