@@ -49,12 +49,11 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
     static boolean        skipDefaultPackage           = false
     static List<String>   dynamicCompileWhiteList      = []
     static List<String>   compileStaticExtensionsList  = []
-    static ListExpression compileStaticExtensions
+    static ListExpression compileStaticExtensions      = null
 
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit sourceUnit) {
-
         if (sourceUnit.name == 'embedded_script_in_groovy_Ant_task' ||
             sourceUnit.name.startsWith('Script') ||
             sourceUnit.name.startsWith('script') ||
@@ -63,13 +62,10 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
             return
         }
 
-        this.sourceUnit = sourceUnit
 
         if (setupConfig) {
+            setupConfiguration()
             setupConfig = false
-            if (!setupConfiguration()) {
-                return
-            }
         }
 
         List<ClassNode> classes = sourceUnit.getAST().getClasses()
@@ -118,44 +114,57 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
                 }
             }
         }
+    }
 
+    static File getConfigFile() {
+        File configFile = null
+        try {
+            configFile = new File(getConventionsFile())
+
+            if (!configFile.exists()) {
+                configFile = new File("./${getConventionsFile()}")
+            }
+
+            if (configFile.exists()) {
+                return configFile
+            }
+
+            return null
+        } catch (Exception e) {
+            //no config file
+        }
     }
 
     /**
      * Sets up the conventions configurations for static compilation.
      */
-    static boolean setupConfiguration() {
+    static void setupConfiguration() {
         ConfigSlurper configSlurper = new ConfigSlurper()
-        File configFile = new File(conventionsFile)
+        File configFile = getConfigFile()
+        Map config = [:]
 
-        if (!configFile.exists()) {
-            return false
-        }
-
-        ConfigObject config = (ConfigObject) configSlurper.parse(configFile?.toURI()?.toURL())?.conventions
-
-        if (!config) {
-            return false
+        if (configFile.exists()) {
+            config = (ConfigObject) configSlurper.parse(configFile?.toURI()?.toURL())?.conventions
         }
 
         disableDynamicCompile = config.disableDynamicCompile != null ? config.disableDynamicCompile : false
-        dynamicCompileWhiteList = (List<String>) config.dynamicCompileWhiteList
+        dynamicCompileWhiteList = (List<String>) config.dynamicCompileWhiteList ?: (List<String>) []
 
-        compileStaticExtensionsList = (List<String>) config.compileStaticExtensions
+        compileStaticExtensionsList = (List<String>) config.compileStaticExtensions ?: (List<String>) []
         limitCompileStaticExtensions = config.limitCompileStaticExtensions != null ? config.limitCompileStaticExtensions : false
 
         defAllowed = config.defAllowed != null ? config.defAllowed : true
         skipDefaultPackage = config.skipDefaultPackage != null ? config.skipDefaultPackage : false
 
-        ListExpression extensions = new ListExpression()
+        if (compileStaticExtensionsList) {
+            ListExpression extensions = new ListExpression()
 
-        for (String extension : compileStaticExtensionsList) {
-            extensions.addExpression(new ConstantExpression(extension))
+            for (String extension : compileStaticExtensionsList) {
+                extensions.addExpression(new ConstantExpression(extension))
+            }
+
+            compileStaticExtensions = extensions
         }
-
-        compileStaticExtensions = extensions
-
-        return true
     }
 
     /**
@@ -254,7 +263,7 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
         if (!hasAnnotation(classNode, getExcludedAnnotations())) {
             AnnotationNode classAnnotation = new AnnotationNode(new ClassNode(CompileStatic))
 
-            if(getExtensions()) {
+            if (getCompileStaticExtensions()) {
                 classAnnotation.addMember(getExtensions(), getCompileStaticExtensions())
             }
 
