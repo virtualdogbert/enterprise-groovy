@@ -32,7 +32,7 @@ version = "1.0.RC2"
 description = "This library provides enterprise level control over Groovy compilation, like static compilation by default."
 
 wrapper {
-    gradleVersion = '4.10.2'
+    gradleVersion = '5.2.1'
 }
 
 repositories {
