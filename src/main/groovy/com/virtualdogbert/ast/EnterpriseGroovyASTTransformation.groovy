@@ -64,7 +64,7 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
 
 
         if (setupConfig) {
-            setupConfiguration()
+            setupConfiguration(sourceUnit)
             setupConfig = false
         }
 
@@ -116,34 +116,46 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
         }
     }
 
-    static File getConfigFile() {
+    /**
+     * Gets the configuration file searching the configuration path derived from the source unit, and  combined with
+     * possible paths build, target, and output.
+     *
+     * @param sourceUnit the source unit used to find the configuration path.
+     *
+     * @return The configuration file if it can be found, and null otherwise.
+     */
+    static File getConfigFile(SourceUnit sourceUnit) {
         File configFile = null
+        List<String> pathsToTry = ['build', 'target', 'output']
+
         try {
-            configFile = new File(getConventionsFile())
+            for (String path : pathsToTry) {
+                String sourceUnitPath = sourceUnit.getConfiguration().getTargetDirectory().absolutePath
+                String projectPath = sourceUnitPath.split(path)[0]
+                configFile = new File("$projectPath/${getConventionsFile()}")
 
-            if (!configFile.exists()) {
-                configFile = new File("./${getConventionsFile()}")
-            }
-
-            if (configFile.exists()) {
-                return configFile
+                if (configFile.exists()) {
+                    return configFile
+                }
             }
 
             return null
         } catch (Exception e) {
-            //no config file
+            return null //no config file defaults will be used
         }
     }
 
     /**
      * Sets up the conventions configurations for static compilation.
+     *
+     * @param sourceUnit the source unit used to find the configuration path.
      */
-    static void setupConfiguration() {
+    static void setupConfiguration(SourceUnit sourceUnit) {
         ConfigSlurper configSlurper = new ConfigSlurper()
-        File configFile = getConfigFile()
+        File configFile = getConfigFile(sourceUnit)
         Map config = [:]
 
-        if (configFile.exists()) {
+        if (configFile) {
             config = (ConfigObject) configSlurper.parse(configFile?.toURI()?.toURL())?.conventions
         }
 
