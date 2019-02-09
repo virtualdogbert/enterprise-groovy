@@ -62,6 +62,8 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
             return
         }
 
+        //This is required by AbstractASTTransformation, or else when calling addError you'll get a NPE.
+        this.sourceUnit = sourceUnit
 
         if (setupConfig) {
             setupConfiguration(sourceUnit)
@@ -74,44 +76,83 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
 
             if (!inWhiteList(classNode) && (!getSkipDefaultPackage() || classNode.packageName)) {
 
-                for (FieldNode fieldNode : classNode.fields) {
-                    if (fieldNode.isDynamicTyped() && !getDefAllowed()) {
-                        addError("def is not allowed for variables.", fieldNode)
-                    }
-                }
 
                 addCompileStatic(classNode)
 
-                if (getDisableDynamicCompile() || getLimitCompileStaticExtensions()) {
-                    if (getDisableDynamicCompile() && !inWhiteList(classNode) & hasAnnotation(classNode, getDynamicAnnotation())) {
-                        addError('Dynamic Compilation is not allowed for this class.', classNode)
-                    }
+                enforcementChecks(classNode)
+            }
+        }
+    }
 
-                    if (getLimitCompileStaticExtensions() && hasOtherExtensions(classNode)) {
-                        addError("Compile Static extensions are limited to: ${getCompileStaticExtensionsList()}", classNode)
-                    }
+    /**
+     * Checks the class node if dynamic compilation is disabled, or limit compile static extensions, is enabled, or if def is not allowed,
+     * by the configuration.
+     *
+     * @param classNode the class node to check.
+     */
+    void enforcementChecks(ClassNode classNode) {
+        //If none of the flags for enforcement are set then there is no reason to do the checks
+        if (getDisableDynamicCompile() || getLimitCompileStaticExtensions() || !getDefAllowed()) {
 
-                    for (MethodNode methodNode : classNode.methods) {
+            if (getDisableDynamicCompile() && !inWhiteList(classNode) & hasAnnotation(classNode, getDynamicAnnotation())) {
+                addError('Dynamic Compilation is not allowed for this class.', classNode)
+            }
 
-                        if (methodNode.isDynamicReturnType() && !getDefAllowed()) {
-                            addError("def is not allowed for methods.", methodNode)
-                        }
+            if (getLimitCompileStaticExtensions() && hasOtherExtensions(classNode)) {
+                addError("Compile Static extensions are limited to: ${getCompileStaticExtensionsList()}", classNode)
+            }
 
-                        if (getDisableDynamicCompile() && !inWhiteList(classNode) && hasAnnotation(methodNode, getDynamicAnnotation())) {
-                            addError('Dynamic Compilation is not allowed for this method.', methodNode)
-                        }
+            checkFieldNodes(classNode.fields)
+            checkMethodNodes(classNode)
+        }
+    }
 
-                        if (getLimitCompileStaticExtensions() && hasOtherExtensions(methodNode)) {
-                            addError("Compile Static extensions are limited to: ${getCompileStaticExtensionsList()}", methodNode)
-                        }
+    /**
+     * Checks the field nodes to see if they are dynamically types, i.e. have def.
+     *
+     * @param fields the field nodes to check, for dynamic typing.
+     */
+    void checkFieldNodes(List<FieldNode> fields) {
+        for (FieldNode fieldNode : fields) {
+            if (fieldNode.isDynamicTyped() && !getDefAllowed()) {
+                addError("def is not allowed for variables.", fieldNode)
+            }
+        }
+    }
 
-                        for (Parameter parameter : methodNode.parameters) {
-                            if (parameter.isDynamicTyped() && !getDefAllowed()) {
-                                addError('Dynamically types parameters are not allowed.', parameter)
-                            }
-                        }
-                    }
-                }
+    /**
+     * Check the  method nodes for dynamic typing.
+     *
+     * @param classNode the class node to check the methods, for.dynamic typing.
+     */
+    void checkMethodNodes(ClassNode classNode) {
+        for (MethodNode methodNode : classNode.methods) {
+
+            if (methodNode.isDynamicReturnType() && !getDefAllowed()) {
+                addError("def is not allowed for methods.", methodNode)
+            }
+
+            if (getDisableDynamicCompile() && !inWhiteList(classNode) && hasAnnotation(methodNode, getDynamicAnnotation())) {
+                addError('Dynamic Compilation is not allowed for this method.', methodNode)
+            }
+
+            if (getLimitCompileStaticExtensions() && hasOtherExtensions(methodNode)) {
+                addError("Compile Static extensions are limited to: ${getCompileStaticExtensionsList()}", methodNode)
+            }
+
+            checkParameters(methodNode.parameters)
+        }
+    }
+
+    /**
+     * The parameters of a method to check for dynamic typing.
+     *
+     * @param parameters an array of parameters to check, for dynamic typing.
+     */
+    void checkParameters(Parameter[] parameters) {
+        for (Parameter parameter : parameters) {
+            if (parameter.isDynamicTyped() && !getDefAllowed()) {
+                addError('Dynamically types parameters are not allowed.', parameter)
             }
         }
     }
