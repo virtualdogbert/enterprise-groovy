@@ -54,11 +54,7 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit sourceUnit) {
-        if (sourceUnit.name == 'embedded_script_in_groovy_Ant_task' ||
-            sourceUnit.name.startsWith('Script') ||
-            sourceUnit.name.startsWith('script') ||
-            sourceUnit.name.startsWith('GStringTemplateScript')
-        ) {
+        if (!sourceUnit?.getConfiguration()?.getTargetDirectory()) {
             return
         }
 
