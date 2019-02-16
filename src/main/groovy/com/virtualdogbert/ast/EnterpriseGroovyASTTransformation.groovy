@@ -43,6 +43,9 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
     static final List<String> dynamicAnnotation   = [CompileDynamic.name]
 
     static boolean        setupConfig                  = true
+
+    static boolean        disable                      = false
+    static boolean        whiteListScripts             = true
     static boolean        disableDynamicCompile        = false
     static boolean        limitCompileStaticExtensions = false
     static boolean        defAllowed                   = true
@@ -54,16 +57,17 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit sourceUnit) {
-        if (!sourceUnit?.getConfiguration()?.getTargetDirectory()) {
-            return
-        }
-
         //This is required by AbstractASTTransformation, or else when calling addError you'll get a NPE.
         this.sourceUnit = sourceUnit
 
         if (setupConfig) {
             setupConfiguration(sourceUnit)
             setupConfig = false
+        }
+
+        //Break out if disabled or the source is a dynamic script, and whitelisting of scripts is true.
+        if (disable || (whiteListScripts && !sourceUnit?.getConfiguration()?.getTargetDirectory())) {
+            return
         }
 
         List<ClassNode> classes = sourceUnit.getAST().getClasses()
@@ -188,13 +192,17 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
      * @param sourceUnit the source unit used to find the configuration path.
      */
     static void setupConfiguration(SourceUnit sourceUnit) {
+        String conventions = System.getProperty('enterprise.groovy.conventions')
         ConfigSlurper configSlurper = new ConfigSlurper()
-        File configFile = getConfigFile(sourceUnit)
         Map config = [:]
 
-        if (configFile) {
-            config = (ConfigObject) configSlurper.parse(configFile?.toURI()?.toURL())?.conventions
+        if (conventions) {
+            config = (ConfigObject) configSlurper.parse(conventions)?.conventions
         }
+
+        disable = config.disable != null ? config.disable : false
+        whiteListScripts = config.whiteListScripts != null ? config.whiteListScripts : true
+        disableDynamicCompile = config.disableDynamicCompile != null ? config.disableDynamicCompile : false
 
         disableDynamicCompile = config.disableDynamicCompile != null ? config.disableDynamicCompile : false
         dynamicCompileWhiteList = (List<String>) config.dynamicCompileWhiteList ?: (List<String>) []
