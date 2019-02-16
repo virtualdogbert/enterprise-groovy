@@ -28,7 +28,7 @@ plugins {
 
 
 group = "com.virtualdogbert"
-version = "1.0.RC3"
+version = "1.0.RC4"
 description = "This library provides enterprise level control over Groovy compilation, like static compilation by default."
 
 wrapper {
