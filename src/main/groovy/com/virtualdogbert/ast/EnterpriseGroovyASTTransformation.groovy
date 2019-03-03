@@ -37,7 +37,6 @@ import org.codehaus.groovy.transform.GroovyASTTransformation
 @CompileStatic
 @GroovyASTTransformation(phase = CompilePhase.SEMANTIC_ANALYSIS)
 class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
-    static final String       conventionsFile     = "conventions.groovy"
     static final String       extensions          = 'extensions'
     static final List<String> excludedAnnotations = [CompileStatic.name, CompileDynamic.name]
     static final List<String> dynamicAnnotation   = [CompileDynamic.name]
@@ -61,7 +60,7 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
         this.sourceUnit = sourceUnit
 
         if (setupConfig) {
-            setupConfiguration(sourceUnit)
+            setupConfiguration()
             setupConfig = false
         }
 
@@ -158,40 +157,18 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
     }
 
     /**
-     * Gets the configuration file searching the configuration path derived from the source unit, and  combined with
-     * possible paths build, target, and output.
-     *
-     * @param sourceUnit the source unit used to find the configuration path.
-     *
-     * @return The configuration file if it can be found, and null otherwise.
-     */
-    static File getConfigFile(SourceUnit sourceUnit) {
-        File configFile = null
-        List<String> pathsToTry = ['build', 'target', 'output']
-
-        try {
-            for (String path : pathsToTry) {
-                String sourceUnitPath = sourceUnit.getConfiguration().getTargetDirectory().absolutePath
-                String projectPath = sourceUnitPath.split(path)[0]
-                configFile = new File("$projectPath/${getConventionsFile()}")
-
-                if (configFile.exists()) {
-                    return configFile
-                }
-            }
-
-            return null
-        } catch (Exception e) {
-            return null //no config file defaults will be used
-        }
-    }
-
-    /**
      * Sets up the conventions configurations for static compilation.
      *
      * @param sourceUnit the source unit used to find the configuration path.
      */
-    static void setupConfiguration(SourceUnit sourceUnit) {
+    static void setupConfiguration() {
+        String console = System.getProperty('enterprise.groovy.console')
+
+        if(console){
+            whiteListScripts = false
+            return
+        }
+
         String conventions = System.getProperty('enterprise.groovy.conventions')
         ConfigSlurper configSlurper = new ConfigSlurper()
         Map config = [:]
