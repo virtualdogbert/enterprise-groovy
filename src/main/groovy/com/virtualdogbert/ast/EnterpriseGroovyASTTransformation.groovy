@@ -22,15 +22,16 @@ package com.virtualdogbert.ast
 
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
+import groovy.transform.TypeCheckingMode
 import org.codehaus.groovy.ast.*
 import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.ListExpression
+import org.codehaus.groovy.ast.expr.PropertyExpression
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.AbstractASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
-
 /**
  * A Global AST transform for applying static compilation and enforcing, based on config.
  */
@@ -93,7 +94,8 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
         //If none of the flags for enforcement are set then there is no reason to do the checks
         if (getDisableDynamicCompile() || getLimitCompileStaticExtensions() || !getDefAllowed()) {
 
-            if (getDisableDynamicCompile() && !inWhiteList(classNode) & hasAnnotation(classNode, getDynamicAnnotation())) {
+            if (getDisableDynamicCompile() && !inWhiteList(classNode) &&
+                (hasAnnotation(classNode, getDynamicAnnotation()) || hasCompileStaticSkip(classNode))) {
                 addError('Dynamic Compilation is not allowed for this class.', classNode)
             }
 
@@ -131,7 +133,8 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
                 addError("def is not allowed for methods.", methodNode)
             }
 
-            if (getDisableDynamicCompile() && !inWhiteList(classNode) && hasAnnotation(methodNode, getDynamicAnnotation())) {
+            if (getDisableDynamicCompile() && !inWhiteList(classNode) &&
+                (hasAnnotation(methodNode, getDynamicAnnotation()) || hasCompileStaticSkip(methodNode))) {
                 addError('Dynamic Compilation is not allowed for this method.', methodNode)
             }
 
@@ -236,6 +239,57 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
         getDynamicCompileWhiteList().any { String path -> classNode.name.contains(path) }
     }
 
+    /**
+     * Checks the class nodes annotations, to see if it has @CompileStatic(TypeCheckingMode.SKIP)
+     *
+     * @param classNode The class node to check for TypeCheckingMode.SKIP on the annotations
+     *
+     * @return true if there is  @CompileStatic(TypeCheckingMode.SKIP), and false otherwise
+     */
+    static boolean hasCompileStaticSkip(ClassNode classNode) {
+        AnnotationNode compileStatic = classNode.annotations.find { AnnotationNode annotationNode ->
+            annotationNode.classNode.name == CompileStatic.class.name
+        }
+
+        if (!compileStatic) {
+            return false
+        }
+
+        PropertyExpression propertyExpression = (PropertyExpression) compileStatic.members['value'] ?: null
+
+        if (propertyExpression){
+            ConstantExpression value = (ConstantExpression)propertyExpression.property
+            return value.value == TypeCheckingMode.SKIP.toString()
+        }
+
+        return false
+    }
+
+    /**
+     * Checks the method nodes annotations, to see if it has @CompileStatic(TypeCheckingMode.SKIP)
+     *
+     * @param methodNode The class node to check for TypeCheckingMode.SKIP on the annotations
+     *
+     * @return true if there is  @CompileStatic(TypeCheckingMode.SKIP), and false otherwise
+     */
+    static boolean hasCompileStaticSkip(MethodNode methodNode) {
+        AnnotationNode compileStatic = methodNode.annotations.find { AnnotationNode annotationNode ->
+            annotationNode.classNode.name == CompileStatic.class.name
+        }
+
+        if(!compileStatic){
+            return false
+        }
+
+        PropertyExpression propertyExpression = (PropertyExpression) compileStatic.members['value'] ?: null
+
+        if (propertyExpression) {
+            ConstantExpression value = (ConstantExpression) propertyExpression.property
+            return value.value == TypeCheckingMode.SKIP.toString()
+        }
+
+        return false
+    }
 
     /**
      * Checks classes for the use of CompileStatic, and checks to see if it uses extensions that are not on the
