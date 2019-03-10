@@ -183,8 +183,6 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
         disable = config.disable != null ? config.disable : false
         whiteListScripts = config.whiteListScripts != null ? config.whiteListScripts : true
         disableDynamicCompile = config.disableDynamicCompile != null ? config.disableDynamicCompile : false
-
-        disableDynamicCompile = config.disableDynamicCompile != null ? config.disableDynamicCompile : false
         dynamicCompileWhiteList = (List<String>) config.dynamicCompileWhiteList ?: (List<String>) []
 
         compileStaticExtensionsList = (List<String>) config.compileStaticExtensions ?: (List<String>) []
