@@ -168,7 +168,10 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
         String console = System.getProperty('enterprise.groovy.console')
 
         if(console){
-            whiteListScripts = false
+            disable = System.getProperty('enterprise.groovy.disable') == 'true'
+            whiteListScripts = System.getProperty('enterprise.groovy.whiteListScripts') == 'true'
+            disableDynamicCompile = System.getProperty('enterprise.groovy.disableDynamicCompile') == 'true'
+            defAllowed = System.getProperty('enterprise.groovy.defAllowed') == 'true'
             return
         }
 
