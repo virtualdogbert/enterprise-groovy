@@ -179,8 +179,12 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
         ConfigSlurper configSlurper = new ConfigSlurper()
         Map config = [:]
 
-        if (conventions) {
-            config = (ConfigObject) configSlurper.parse(conventions)?.conventions
+        try {
+            if (conventions) {
+                config = (ConfigObject) configSlurper.parse(conventions)?.conventions
+            }
+        } catch (Exception e) {
+            println "WARN - Enterprise Groovy config can't be parsed, falling back to defaults"
         }
 
         disable = config.disable != null ? config.disable : false
