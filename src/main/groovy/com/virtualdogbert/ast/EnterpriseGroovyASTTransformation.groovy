@@ -61,8 +61,13 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
         this.sourceUnit = sourceUnit
 
         if (setupConfig) {
-            setupConfiguration()
-            setupConfig = false
+            try {
+                setupConfiguration()
+                setupConfig = false
+            } catch (Exception e) {
+                println "WARN - Enterprise Groovy config can't be parsed, falling back to defaults"
+                e.printStackTrace()
+            }
         }
 
         //Break out if disabled or the source is a dynamic script, and whitelisting of scripts is true.
