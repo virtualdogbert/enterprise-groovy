@@ -204,3 +204,11 @@ task docs(dependsOn: [asciidoc]) {
         include '**/*.png'
     }
 }
+
+
+test {
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+    }
+}
