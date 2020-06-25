@@ -22,6 +22,7 @@ package com.virtualdogbert.ast
 
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
+import groovy.transform.Memoized
 import groovy.transform.TypeCheckingMode
 import org.codehaus.groovy.ast.*
 import org.codehaus.groovy.ast.expr.ConstantExpression
@@ -53,7 +54,9 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
     static List<String>   dynamicCompileWhiteList      = []
     static List<String>   compileStaticExtensionsList  = []
     static ListExpression compileStaticExtensions      = null
+    static List<String>   allowedSuppressions          = []
 
+    private static final ClassNode SUPPRESS_WARNINGS_CLASSNODE = new ClassNode(SuppressWarnings)
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit sourceUnit) {
@@ -120,7 +123,7 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
      */
     void checkFieldNodes(List<FieldNode> fields) {
         for (FieldNode fieldNode : fields) {
-            if (fieldNode.isDynamicTyped() && !getDefAllowed()) {
+            if (fieldNode.isDynamicTyped() && !getDefAllowed() && !isDefRequiredSurpressed(fieldNode)) {
                 addError("def is not allowed for variables.", fieldNode)
             }
         }
@@ -134,7 +137,7 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
     void checkMethodNodes(ClassNode classNode) {
         for (MethodNode methodNode : classNode.methods) {
 
-            if (methodNode.isDynamicReturnType() && !getDefAllowed()) {
+            if (methodNode.isDynamicReturnType() && !getDefAllowed() && !isDefRequiredSurpressed(methodNode)) {
                 addError("def is not allowed for methods.", methodNode)
             }
 
@@ -147,7 +150,7 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
                 addError("Compile Static extensions are limited to: ${getCompileStaticExtensionsList()}", methodNode)
             }
 
-            checkParameters(methodNode.parameters)
+            checkParameters(methodNode)
         }
     }
 
@@ -156,9 +159,9 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
      *
      * @param parameters an array of parameters to check, for dynamic typing.
      */
-    void checkParameters(Parameter[] parameters) {
-        for (Parameter parameter : parameters) {
-            if (parameter.isDynamicTyped() && !getDefAllowed()) {
+    void checkParameters(MethodNode methodNode) {
+        for (Parameter parameter : methodNode.parameters) {
+            if (parameter.isDynamicTyped() && !getDefAllowed() && !isDefRequiredSurpressed(methodNode)) {
                 addError('Dynamically types parameters are not allowed.', parameter)
             }
         }
@@ -201,6 +204,7 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
         limitCompileStaticExtensions = config.limitCompileStaticExtensions != null ? config.limitCompileStaticExtensions : false
 
         defAllowed = config.defAllowed != null ? config.defAllowed : true
+        allowedSuppressions = (List<String>) config.allowedSuppressions ?: (List<String>) []
         skipDefaultPackage = config.skipDefaultPackage != null ? config.skipDefaultPackage : false
 
         if (compileStaticExtensionsList) {
@@ -367,6 +371,36 @@ class EnterpriseGroovyASTTransformation extends AbstractASTTransformation {
 
             classNode.addAnnotation(classAnnotation)
         }
+    }
+
+    @Memoized
+    private static boolean isDefRequiredSurpressed(AnnotatedNode node) {
+        if (isDefRequiredSuppressedInClass(node.declaringClass)) {
+            return true
+        }
+        return node.getAnnotations(SUPPRESS_WARNINGS_CLASSNODE).any { hasSuppression(it) }
+    }
+
+    @Memoized
+    private static boolean isDefRequiredSuppressedInClass(ClassNode classNode) {
+        return classNode.getAnnotations(SUPPRESS_WARNINGS_CLASSNODE).any { hasSuppression(it) }
+    }
+
+    private static boolean hasSuppression(AnnotationNode annotation) {
+        return hasSuppression(annotation.getMember('value'))
+    }
+
+    private static boolean hasSuppression(Expression annotationValue) {
+        if (!annotationValue) {
+            return false
+        }
+        if (annotationValue instanceof ConstantExpression) {
+            return allowedSuppressions.contains(annotationValue.value as String)
+        }
+        if (annotationValue instanceof ListExpression) {
+            return annotationValue.expressions.any { hasSuppression(it) }
+        }
+        return false
     }
 
 }
